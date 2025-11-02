@@ -30,24 +30,27 @@ def get_redis_cache_metrics():
         dict: {
             "keyspace_hits": int,
             "keyspace_misses": int,
-            "hit_ratio": float,  # 0.0..1.0
+            "hit_ratio": float,  # 0..1
         }
     """
-    conn = get_redis_connection("default")
-
     try:
-        info = conn.info("stats")
-    except TypeError:
-        info = conn.info()
+        conn = get_redis_connection("default")
+        try:
+            info = conn.info("stats")
+        except TypeError:
+            info = conn.info()
+    except Exception as e:
+        logger.error("Failed to obtain Redis INFO: %s", e)
+        return {"keyspace_hits": 0, "keyspace_misses": 0, "hit_ratio": 0}
 
     hits = int(info.get("keyspace_hits", 0))
     misses = int(info.get("keyspace_misses", 0))
-    total = hits + misses
-    hit_ratio = (hits / total) if total > 0 else 0.0
+    total_requests = hits + misses
+    hit_ratio = (hits / total_requests) if total_requests > 0 else 0
 
     logger.info(
-        "Redis cache metrics: keyspace_hits=%s keyspace_misses=%s hit_ratio=%.4f",
-        hits, misses, hit_ratio
+        "Redis cache metrics: keyspace_hits=%s keyspace_misses=%s total=%s hit_ratio=%.4f",
+        hits, misses, total_requests, hit_ratio
     )
 
     return {
